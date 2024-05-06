@@ -121,21 +121,20 @@ int main(int argc, char** argv) {
         }
     }
 
-    int print_color = args.color;
-    if (print_color == COLOR_AUTO) {
-        print_color = isatty(fileno(stdout));
+    if (args.color == COLOR_AUTO) {
+        args.color = isatty(fileno(stdout));
     }
 
     char buf[MAX_COLS] = "";
     int bytes_read = 0;
-    int row = 0;
 
-    while ((bytes_read = fread(buf, sizeof(char), args.columns, fp))) {
+    for (int row = 0;
+         (bytes_read = fread(buf, sizeof(char), args.columns, fp)) > 0; row++) {
         // Index
         printf("%08x: ", row * args.columns);
 
         // Bytes
-        if (print_color) {
+        if (args.color) {
             printf("\x1b[1m");
         }
         for (int i = 0; i < args.columns; i++) {
@@ -148,7 +147,7 @@ int main(int argc, char** argv) {
             }
 
             signed char ch = buf[i];
-            if (print_color) {
+            if (args.color) {
                 if (ch == '\0') {
                     printf("\x1b[37m");
                 } else if (ch == '\xff') {
@@ -170,7 +169,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < bytes_read; i++) {
             signed char ch = buf[i];
 
-            if (print_color) {
+            if (args.color) {
                 if (ch == '\0') {
                     printf("\x1b[37m");
                 } else if (ch == '\xff') {
@@ -192,11 +191,9 @@ int main(int argc, char** argv) {
             }
         }
 
-        if (print_color) {
+        if (args.color) {
             printf("\x1b[0m");
         }
         printf("\n");
-
-        row++;
     };
 }
