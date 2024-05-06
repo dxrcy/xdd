@@ -2,22 +2,33 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define MAX_COLS 256
+
+enum ColorMode {
+    COLOR_NEVER,
+    COLOR_ALWAYS,
+    COLOR_AUTO,
+};
 
 struct Args {
     char* filename;
     unsigned int columns;
+    enum ColorMode color;
 };
 
 enum ArgOption {
     OPT_NONE,
     OPT_COLUMNS,
+    OPT_COLOR,
 };
 
 int parse_args(struct Args* args, int argc, char** argv) {
     args->filename = NULL;
     args->columns = 16;
+    args->color = COLOR_AUTO;
 
     enum ArgOption prev_opt = OPT_NONE;
 
@@ -31,10 +42,12 @@ int parse_args(struct Args* args, int argc, char** argv) {
             if (arg[0] == '\0') {
                 return 1;
             }
-            if (arg[0] == 'c') {
-                prev_opt = OPT_COLUMNS;
-            } else if (arg[0] == 'h') {
+            if (arg[0] == 'h') {
                 return -1;
+            } else if (arg[0] == 'c') {
+                prev_opt = OPT_COLUMNS;
+            } else if (arg[0] == 'R') {
+                prev_opt = OPT_COLOR;
             } else {
                 fprintf(stderr, "Unknown option `-%c`.\n", arg[0]);
                 return 1;
@@ -55,6 +68,16 @@ int parse_args(struct Args* args, int argc, char** argv) {
                     }
                     args->columns = columns;
                 }; break;
+
+                case OPT_COLOR:
+                    if (!strcmp(arg, "never")) {
+                        args->color = COLOR_NEVER;
+                    } else if (!strcmp(arg, "always")) {
+                        args->color = COLOR_ALWAYS;
+                    } else if (strcmp(arg, "auto")) {
+                        fprintf(stderr, "Invalid value for `-R`: `%s`.\n", arg);
+                    }
+                    break;
 
                 default: {
                     if (args->filename != NULL) {
@@ -98,6 +121,11 @@ int main(int argc, char** argv) {
         }
     }
 
+    int print_color = args.color;
+    if (print_color == COLOR_AUTO) {
+        print_color = isatty(fileno(stdout));
+    }
+
     char buf[MAX_COLS] = "";
     int bytes_read = 0;
     int row = 0;
@@ -107,7 +135,9 @@ int main(int argc, char** argv) {
         printf("%08x: ", row * args.columns);
 
         // Bytes
-        printf("\x1b[1m");
+        if (print_color) {
+            printf("\x1b[1m");
+        }
         for (int i = 0; i < args.columns; i++) {
             if (i > 0 && i % 2 == 0) {
                 printf(" ");
@@ -118,17 +148,20 @@ int main(int argc, char** argv) {
             }
 
             signed char ch = buf[i];
-            if (ch == '\0') {
-                printf("\x1b[37m");
-            } else if (ch == '\xff') {
-                printf("\x1b[34m");
-            } else if (isspace(ch) && ch != ' ') {
-                printf("\x1b[33m");
-            } else if (!isprint(ch)) {
-                printf("\x1b[31m");
-            } else {
-                printf("\x1b[32m");
+            if (print_color) {
+                if (ch == '\0') {
+                    printf("\x1b[37m");
+                } else if (ch == '\xff') {
+                    printf("\x1b[34m");
+                } else if (isspace(ch) && ch != ' ') {
+                    printf("\x1b[33m");
+                } else if (!isprint(ch)) {
+                    printf("\x1b[31m");
+                } else {
+                    printf("\x1b[32m");
+                }
             }
+
             printf("%02x", (unsigned char)ch);
         }
         printf("  ");
@@ -137,23 +170,31 @@ int main(int argc, char** argv) {
         for (int i = 0; i < bytes_read; i++) {
             signed char ch = buf[i];
 
-            if (ch == '\0') {
-                printf("\x1b[37m");
-            } else if (ch == '\xff') {
-                printf("\x1b[34m");
-            } else if (ch == '\n') {
-                printf("\x1b[33m");
-            } else if (!isprint(ch)) {
-                printf("\x1b[31m");
-            } else {
-                printf("\x1b[32m");
-                printf("\x1b[32m");
-                printf("%c", buf[i]);
-                continue;
+            if (print_color) {
+                if (ch == '\0') {
+                    printf("\x1b[37m");
+                } else if (ch == '\xff') {
+                    printf("\x1b[34m");
+                } else if (ch == '\n') {
+                    printf("\x1b[33m");
+                } else if (!isprint(ch)) {
+                    printf("\x1b[31m");
+                } else {
+                    printf("\x1b[32m");
+                    printf("\x1b[32m");
+                }
             }
-            printf(".");
+
+            if (isprint(ch)) {
+                printf("%c", ch);
+            } else {
+                printf(".");
+            }
         }
-        printf("\x1b[0m");
+
+        if (print_color) {
+            printf("\x1b[0m");
+        }
         printf("\n");
 
         row++;
