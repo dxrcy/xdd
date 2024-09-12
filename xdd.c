@@ -15,7 +15,7 @@ enum ColorMode {
 
 struct Args {
     char* filename;
-    unsigned int columns;
+    size_t columns;
     enum ColorMode color;
 };
 
@@ -126,18 +126,18 @@ int main(int argc, char** argv) {
     }
 
     char buf[MAX_COLS] = "";
-    int bytes_read = 0;
+    size_t bytes_read = 0;
 
-    for (int row = 0;
+    for (size_t row = 0;
          (bytes_read = fread(buf, sizeof(char), args.columns, fp)) > 0; row++) {
         // Index
-        printf("%08x: ", row * args.columns);
+        printf("%08x: ", (int)(row * args.columns));
 
         // Bytes
         if (args.color) {
             printf("\x1b[1m");
         }
-        for (int i = 0; i < args.columns; i++) {
+        for (size_t i = 0; i < args.columns; i++) {
             if (i > 0 && i % 2 == 0) {
                 printf(" ");
             }
@@ -146,7 +146,7 @@ int main(int argc, char** argv) {
                 continue;
             }
 
-            signed char ch = buf[i];
+            char ch = buf[i];
             if (args.color) {
                 if (ch == '\0') {
                     printf("\x1b[37m");
@@ -161,13 +161,13 @@ int main(int argc, char** argv) {
                 }
             }
 
-            printf("%02x", (unsigned char)ch);
+            printf("%02hhx", ch);
         }
         printf("  ");
 
         // Characters
-        for (int i = 0; i < bytes_read; i++) {
-            signed char ch = buf[i];
+        for (size_t i = 0; i < bytes_read; i++) {
+            char ch = buf[i];
 
             if (args.color) {
                 if (ch == '\0') {
